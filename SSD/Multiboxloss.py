@@ -110,3 +110,47 @@ def Multibox_loss(self,prediction,target):
     loss_neg_anchors = loss_neg_anchors[hard_negatives]  
     class_loss = (loss_neg_anchors.sum() + loss_pos_anchors.sum())
     return class_loss,bbbox_loss,landm_loss,[class_acc,box_acc,land_acc],no_pos  
+
+
+
+def match_anchors(self,class_t,bbox_t,kptns_t,thresh):
+  
+  # find iou for all anchors with all boxes
+  overlap_iou_matrix=jaccard(bbox_t,self.generated_anchors_minmax)# target bbox is created by min max and jaccard calculates using that
+  #print(bbox_t.shape,self.generated_anchors.shape,overlap_iou_matrix.shape)
+  #torch.Size([1, 4]) torch.Size([26610, 4]) torch.Size([1, 26610])
+  #boundingbox,no_Anchors
+
+  maxi,_=overlap_iou_matrix.max(1)
+  #print((maxi>0.2).long().sum())
+  if((maxi>thresh).long().sum()==0):
+    #print("no bounding box for this batch")
+    #print(maxi,bbox_t)
+    #assert(1==2)
+    return []
+
+
+  #assign the bounding box to the anchor having high coverage 
+
+  #  iou val for which the anchor merges the most with the available bounding box    , the id of the bouding box to whcih the anchor merged the mose
+  max_iou_anchor,max_iou_anchorid =overlap_iou_matrix.max(0) 
+
+  #print(max_iou_anchor.shape,max_iou_anchorid.shape)
+
+  
+
+  #the bounding box coordinates to which the anchor had more overlap
+  bbox_t=cvt_chw(bbox_t)
+
+  bbox_anchors_more_iou=bbox_t[max_iou_anchorid]
+  inter_bbox=encode_bbox(bbox_anchors_more_iou,self.generated_anchors)
+
+ 
+
+  # retrive the class from the id of the bounding box having the more overlap(background has 0 overlap with first box asn it is taken for the class of the anchors) and they are remove with the help of iou value and thresh 
+  class_anchors_more_iou=class_t[max_iou_anchorid]
+  #background class which implies there is no object in the box
+  class_anchors_more_iou[max_iou_anchor<thresh]=0
+
+  #print(inter_bbox.shape,inter_landm.shape,class_anchors_more_iou.shape)
+  return [class_anchors_more_iou,inter_bbox]
